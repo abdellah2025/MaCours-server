@@ -12,6 +12,17 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const admin = require("firebase-admin");
 const { v4: uuidv4 } = require("uuid");
 
+// ─── NEW: routes migrées depuis Cloud Functions (plan Spark, pas de Blaze) ───
+// Chaque fichier fait `require("firebase-admin")` et appelle admin.firestore()/
+// admin.auth() UNIQUEMENT à l'intérieur de ses handlers (jamais au chargement
+// du module) — donc peu importe que ces `require` soient exécutés avant ou
+// après le bloc d'initialisation Firebase Admin plus bas, tant que ce bloc
+// s'exécute AVANT qu'une vraie requête HTTP n'arrive, ce qui est toujours le
+// cas ici (l'initialisation est synchrone, au démarrage du process).
+const enrollmentsRouter = require("./routes/enrollments.cjs");
+const adminStatsRouter = require("./routes/adminStats.cjs");
+const cronRouter = require("./routes/cron.cjs");
+
 // ─── Express App ─────────────────────────────────────────────────────────────
 const app = express();
 
@@ -61,6 +72,17 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
 } else {
   console.warn("⚠️  FIREBASE_SERVICE_ACCOUNT_JSON absent — vérification token désactivée");
 }
+
+// ─── NEW: routes enrollments / admin / cron ──────────────────────────────────
+// Toutes les routes de enrollmentsRouter et adminStatsRouter font
+// admin.auth()/admin.firestore() en interne — si FIREBASE_SERVICE_ACCOUNT_JSON
+// est absent (bloc juste au-dessus), aucune admin.App n'existe et ces routes
+// répondront par une erreur 500 explicite au lieu de planter le process ;
+// c'est un pré-requis pour toute cette fonctionnalité, pas optionnel comme
+// pour /media plus bas.
+app.use("/api/enrollments", enrollmentsRouter);
+app.use("/api/admin", adminStatsRouter);
+app.use("/api/cron", cronRouter);
 
 // ─── Cloudflare R2 (compatible S3) ───────────────────────────────────────────
 const s3 = new S3Client({
