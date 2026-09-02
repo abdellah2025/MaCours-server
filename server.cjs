@@ -249,6 +249,7 @@ app.post("/upload/multipart/abort", async (req, res) => {
 });
 
 // ─── GET /media (inchangé) ────────────────────────────────────────────────
+// ─── GET /media (durée de vie configurable, 1h par défaut) ──────────────────
 app.get("/media", async (req, res) => {
   try {
     const fileKey = req.query.file;
@@ -262,12 +263,16 @@ app.get("/media", async (req, res) => {
         return res.status(401).json({ error: "Authentification requise" });
       }
     }
+
+    // NEW — paramétrable via SIGNED_URL_EXPIRATION, fallback 3600 (1h)
+    const expiresIn = Number(process.env.SIGNED_URL_EXPIRATION) || 3600;
+
     const getCmd = new GetObjectCommand({
       Bucket: process.env.R2_BUCKET,
       Key: fileKey,
     });
-    const url = await getSignedUrl(s3, getCmd, { expiresIn: 300 });
-    return res.json({ url, expiresIn: 300 });
+    const url = await getSignedUrl(s3, getCmd, { expiresIn });
+    return res.json({ url, expiresIn });
   } catch (err) {
     console.error("Erreur /media :", err);
     return res.status(500).json({ error: err.message || "Erreur serveur" });
