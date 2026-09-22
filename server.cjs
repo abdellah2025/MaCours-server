@@ -26,9 +26,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://be-ensamaine.web.app",
-  'https://macours.com',
-  'https://www.macours.com',
-  'https://files.macours.com'
+  "https://2beensamaine.com",
 ];
 
 app.use(
